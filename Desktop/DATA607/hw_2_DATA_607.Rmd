@@ -1,0 +1,87 @@
+---
+title: "Data607_HW2"
+author: "alexander"
+date: "9/4/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+csvFile = "/Users/alejandro/Desktop/DATA607/movieReviews.csv"
+```
+
+
+```{r}
+#WRITING TO CSV
+movieReviews <- matrix(c(5,4,4,2,1,1,3,4,4,3,4,1,1,5,5,5,1,5,3,5,5,5,1,5,3,1,3,1,5,1), ncol=6,byrow=TRUE)
+colnames(movieReviews) <- c("Crazy Rich Asians",
+                            "Christopher Robin",
+                            "Incredibles 2", 
+                            "Hotel Transylvania 3: Summer Vacation",
+                            "Slender Man",
+                            "Napoleon Dynamite")
+
+rownames(movieReviews) <- c("Bobby Gong",
+                             "Steven Ralbovsky",
+                             "Steve Sr",
+                             "Tommy Pickles",
+                             "Ken Richards")
+movieReviews <- as.table(movieReviews)
+movieReviews
+
+write.csv(movieReviews, file = csvFile, row.names = TRUE)
+
+```
+
+```{r}
+#USING MARIADB
+library(RMySQL)
+library(DBI)
+
+## Connect to my-db as defined in ~/.my.cnf Connect to 
+con <- dbConnect(RMariaDB::MariaDB(), group = "my-db", password = 'toor', db = 'cuny')
+
+dbListTables(con)
+
+movieTable <- read.csv(file=csvFile, header=TRUE, sep=",")
+
+movieTable
+dbWriteTable(con, "movieTable", movieTable, overwrite=TRUE)
+dbListTables(con)
+
+dbListFields(con, "movieTable")
+dbReadTable(con, "movieTable")
+
+
+# You can fetch all results:
+res <- dbSendQuery(con, "SELECT * FROM movieTable")
+dbFetch(res)
+dbClearResult(res)
+
+# Clear the result
+dbClearResult(res)
+
+# Disconnect from the database
+dbDisconnect(con)
+```
+
+
+
+```{r}
+#USING SPARK
+#http://spark.rstudio.com/
+library(sparklyr)
+library(DBI)
+library(dplyr)
+#spark_install(version = "2.1.0")
+
+sc <- spark_connect(master = "local")
+movieRDD <- spark_read_csv(sc, name = "movieTableSpark", path = csvFile, header = TRUE, delimiter = ",")
+#createOrReplaceTempView(movieRDD, "movieRDD")
+
+movieRDD <- sql("SELECT * FROM movieRDD")
+movieRDD
+```
+
+
+
