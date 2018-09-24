@@ -1,0 +1,176 @@
+---
+title: "Project 1"
+output: html_notebook
+---
+
+Project 1 Collaboration with Jack Russo.  Jack did most of the extraction, and I wrangled the data and learned how to integrate
+python and bash into R projects.  Also normalized the data for future feature extraction and mainting data integrity as
+either a .psv or .csv
+
+Jack submitted on time, and I've been late to compile the collaboration and notes.
+
+```{r install}
+#install.packages("reticulate")
+#install.packages("pandas")
+```
+```{r setup, include=FALSE}
+library(reticulate)
+use_virtualenv("r-reticulate")
+
+#use_python('/usr/local/bin/python27', required = TRUE)
+```
+
+```{python}
+# coding: utf-8
+import pandas as pd
+import re
+import os
+
+myFile  = 'alejandroniculescu/cuny/DATA607/tournamentinfo.txt'
+newFile = '/Users/alejandro/documents/R/DATA607/data/ti_2.txt' 
+
+pd.set_option('display.max_colwidth', -1)
+df = pd.read_csv(myFile, header = None)
+
+s = ""
+
+with open(myFile) as f:
+    s = " ".join(line.strip() for line in f) 
+
+dirname = os.path.dirname(newFile)
+if not os.path.exists(dirname):
+    os.makedirs(dirname)
+with open(newFile, 'w') as file:
+  file.write(s)
+
+file.close()
+```
+
+```{r load-data}
+library(stringr)
+
+newFile = '/Users/alejandro/documents/R/DATA607/data/ti_2.txt' 
+
+#my_data <- read.table(eloFile, header = TRUE)
+dat <- readLines(newFile)
+#dat
+nu <- str_replace_all(dat, "[[:punct:]]$|[-]{4,100}", "\n")
+nu <- str_replace_all(nu, "[ ]{2,20}+", "")
+
+nu <- nu[nu != ""]
+
+nu <- strsplit(nu, "\n")
+
+#nu <- str_replace_all(nu, '\"', "")
+
+df <- data.frame(nu)
+
+df <- tail(df, -2)
+
+df <- as.data.frame(sapply(df, function(x) gsub('\"', "", x)))
+
+df
+
+#head(df)
+#write.table((str_extract(nu, "[[:space:]]+[[:digit:]]+[[:space:]][|]")), file = "/Users/alejandro/documents/R/DATA607/data/hmm.csv",row.names=FALSE, na="",col.names=TRUE, sep="|")
+
+#(str_extract(nu, "^[[:space:]]+[[:digit:]]+[[:space:]][|]"))
+
+write.table(df, file = "/Users/alejandro/documents/R/DATA607/data/ti_3.csv", row.names=FALSE, col.names=FALSE, quote=FALSE)
+```
+```{r read-csv}
+ti_3 = "/Users/alejandro/documents/R/DATA607/data/ti_3.csv"
+
+# Read Data in
+x <- (ti_3)
+data_sans_header <- read.delim(x, header = FALSE, stringsAsFactors = FALSE)
+```
+
+```{r player-names}
+# Find Player Names
+regex_names <- unlist(str_extract_all(data_sans_header, "[[:upper:][:blank:][:upper:], ]{15,}" ))
+regex_names <- regex_names[-1]
+regex_names[28] <- "SOFIA ADINA STANESCU-BELLU"
+print(length(regex_names))
+```
+
+```{r}
+#JR
+# Find Player States of Origin
+regex_states <- unlist(str_extract_all(data_sans_header, "[:space:]MI[:space:]|[:space:]ON|[:space:]OH" ))
+print(length(regex_states))
+```
+
+```{r}
+#JR
+# Find Total Scores
+regex_scores <- unlist(str_extract_all(data_sans_header, "[[:digit:]].[[:digit:]][:blank:][:blank:]" ))
+regex_scores <- unlist(str_extract_all(regex_scores,"[:digit:][:punct:][:digit:]"))
+print(length(regex_scores))
+```
+
+```{r}
+# Find Pre-Tournament Ratings
+regex_pre_tournament_rating <- unlist(str_extract_all(data_sans_header, "[[:space:]][[:digit:]][[:digit:]][[:digit:]][[:digit:][P]]?[[:digit:][P]]?[[:digit:]]?[[:digit:]]?"))
+regex_pre_tournament_rating <- regex_pre_tournament_rating[-126]
+regex_pre_tournament_rating <- regex_pre_tournament_rating[-123]
+regex_pre_tournament_rating <- regex_pre_tournament_rating[-120]
+regex_pre_tournament_rating <- regex_pre_tournament_rating[-117]
+v <- seq(from = 2, to= 128, by = 2)
+regex_pre_tournament_rating <- regex_pre_tournament_rating[v]
+regex_pre_tournament_rating_sans_P <- unlist(str_extract_all(regex_pre_tournament_rating, "[[:digit:]][[:digit:]][[:digit:]][[:digit:]]?"))
+Pre_Tournament_Rating <- as.numeric(regex_pre_tournament_rating_sans_P)
+```
+
+```{r}
+#JR
+# Build Initial Data Frame
+Queen_Takes_Bishop <- data.frame(Player = regex_names, Player_State = regex_states, Total_Player_Score = regex_scores, Pre_Tournament_Rating)
+Queen_Takes_Bishop
+```
+```{r}
+# Find Average Opponent Rating 
+v <- seq(from = 5, to= 196, by = 3)
+opponent_lines <- data_sans_header[v] 
+Average_Opponent_Rating <- NULL
+
+for (i in 1:length(opponent_lines)){
+  opponent_lines1 <- unlist(str_extract_all(opponent_lines[i], "[:space:][[:digit:]]?[[:digit:]]" ))
+  opponent_lines1 <- opponent_lines1[-1]
+  opponent_lines1 <- unlist(str_extract_all(opponent_lines1, "[[:digit:]]?[[:digit:]]" ))
+  opponents_line_1_vector <- as.numeric(opponent_lines1) 
+  Average_Opponent_Rating[i] <- round(sum(Queen_Takes_Bishop$Pre_Tournament_Rating[opponents_line_1_vector])/length(opponents_line_1_vector))
+}
+```
+
+
+
+```{r}
+# Complete Data Frame
+if (length(regex_names) == length(regex_states) && length(regex_scores) == length(regex_states)) {
+Queen_Takes_Bishop <- data.frame(Player = regex_names, Player_State = regex_states, Total_Player_Score = regex_scores, Pre_Tournament_Rating, Average_Opponent_Rating)
+} else {
+  print(length(regex_names))
+  print(length(regex_states))
+  print(length(regex_scores))
+  }
+Queen_Takes_Bishop
+```
+
+```{r}
+# Export to CSV
+# Note! Will export to directory where R project is stored. Use setwd() to change to desired directory.
+write.csv(Queen_Takes_Bishop, file = "Chess_Tournament_Data.csv")
+```
+
+Lessons Learned
+Will try and divide every group project into data ingestion | ETL | and indexing / vizualizing.  
+
+Optional parts would be anaylitcs and system
+
+*TODO*
+create a team git repo and combine code together through git
+create R automated tests 
+learn to write boiler plate functions to collaborate and test efficiently
+
+
